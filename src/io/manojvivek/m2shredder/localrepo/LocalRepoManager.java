@@ -6,5 +6,7 @@ package io.manojvivek.m2shredder.localrepo;
  */
 public interface LocalRepoManager {
 
+	public static final String _REPOSITORY_STRING = "repository/";
+
     public void initialize();
 }
