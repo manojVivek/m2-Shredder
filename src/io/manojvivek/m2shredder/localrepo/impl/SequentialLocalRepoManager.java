@@ -3,10 +3,17 @@ package io.manojvivek.m2shredder.localrepo.impl;
 import io.manojvivek.m2shredder.exception.M2PathException;
 import io.manojvivek.m2shredder.localrepo.LocalRepoManager;
 
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,8 +78,54 @@ public class SequentialLocalRepoManager implements LocalRepoManager {
 	 * 
 	 * @see io.manojvivek.m2shredder.localrepo.LocalRepoManager#initialize()
 	 */
+	@Override
 	public void initialize() {
 		// TODO Scan the user home /.m2/repository and build the details
+		Path path = Paths.get(m2RepoPath);
+		try {
+			PomFinder finder = new PomFinder();
+			Files.walkFileTree(path, finder);
+			System.out.println(finder.getPomPaths().size() + " " + finder.getPomPaths());
+
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+
+	class PomFinder implements FileVisitor<Path> {
+		
+		ArrayList<Path> pomPaths = new ArrayList<>();
+		PathMatcher pathMatcher = FileSystems.getDefault().getPathMatcher("glob:**.pom");
+
+		@Override
+		public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+			return FileVisitResult.CONTINUE;
+		}
+
+		@Override
+		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+			// System.out.println(file.toString());
+			if (pathMatcher.matches(file)) {
+				pomPaths.add(file);
+			}
+			return FileVisitResult.CONTINUE;
+		}
+
+		@Override
+		public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+			return FileVisitResult.CONTINUE;
+		}
+
+		@Override
+		public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+			return FileVisitResult.CONTINUE;
+		}
+
+		public ArrayList<Path> getPomPaths() {
+			return pomPaths;
+		}
 
 	}
 
