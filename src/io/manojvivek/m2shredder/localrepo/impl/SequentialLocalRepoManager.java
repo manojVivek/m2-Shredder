@@ -1,22 +1,19 @@
 package io.manojvivek.m2shredder.localrepo.impl;
 
 import io.manojvivek.m2shredder.exception.M2PathException;
+import io.manojvivek.m2shredder.exception.PomFinderException;
 import io.manojvivek.m2shredder.localrepo.LocalRepoManager;
 
-import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.logging.Level;
+import java.util.List;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.apache.maven.model.Dependency;
 import org.codehaus.plexus.util.StringUtils;
 
 /**
@@ -25,9 +22,17 @@ import org.codehaus.plexus.util.StringUtils;
  */
 public class SequentialLocalRepoManager implements LocalRepoManager {
 
+	private static final char PATH_SEPARATOR = '/';
+
+	private static final char ARTIFACT_SEPARATOR = '-';
+
+	private Pattern VERSION_FILE_PATTERN = Pattern.compile("^(.*)-([0-9]{8}.[0-9]{6})-([0-9]+)$");
+
 	private Logger logger = Logger.getLogger(SequentialLocalRepoManager.class.getName());
 
 	public String m2RepoPath;
+
+	private List<String> poms;
 
 	public SequentialLocalRepoManager(String m2DirPath) throws M2PathException {
 		super();
@@ -55,7 +60,7 @@ public class SequentialLocalRepoManager implements LocalRepoManager {
 	 * @param m2Path
 	 */
 	private String validateM2Path(String m2Path) throws M2PathException {
-		if(StringUtils.isEmpty(m2Path)) {
+		if (StringUtils.isEmpty(m2Path)) {
 			throw new M2PathException("Specified M2 Path is empty");
 		}
 		try {
@@ -67,7 +72,7 @@ public class SequentialLocalRepoManager implements LocalRepoManager {
 				throw new M2PathException("repository directory in m2 dir doesn't exists");
 			}
 		} catch (InvalidPathException e) {
-			logger.log(Level.SEVERE, "Invalid .m2 path" + e.getMessage(), e);
+			// logger.log(Level.SEVERE, "Invalid .m2 path" + e.getMessage(), e);
 			throw new M2PathException(e);
 		}
 
@@ -81,52 +86,64 @@ public class SequentialLocalRepoManager implements LocalRepoManager {
 	@Override
 	public void initialize() {
 		// TODO Scan the user home /.m2/repository and build the details
-		Path path = Paths.get(m2RepoPath);
-		try {
-			PomFinder finder = new PomFinder();
-			Files.walkFileTree(path, finder);
-			System.out.println(finder.getPomPaths().size() + " " + finder.getPomPaths());
 
-		} catch (IOException e) {
+		LocalRepoPomFinder pomFinder = new LocalRepoPomFinder(m2RepoPath);
+		try {
+			poms = pomFinder.findPoms();
+			System.out.println(".m2 poms:" + poms.size() + " files:" + poms);
+		} catch (PomFinderException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
 	}
 
-	class PomFinder implements FileVisitor<Path> {
-		
-		ArrayList<Path> pomPaths = new ArrayList<>();
-		PathMatcher pathMatcher = FileSystems.getDefault().getPathMatcher("glob:**.pom");
+	public boolean hasArtifact(Dependency dependency) {
+		String dependencyPomPath = getLocalRepoPomPath(dependency);
+		return poms.contains(dependencyPomPath);
+	}
 
-		@Override
-		public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}
+	/**
+	 * @param dependency
+	 * @return
+	 */
+	public String getLocalRepoPomPath(Dependency dependency) {
 
-		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-			// System.out.println(file.toString());
-			if (pathMatcher.matches(file)) {
-				pomPaths.add(file);
-			}
-			return FileVisitResult.CONTINUE;
-		}
+		StringBuilder path = new StringBuilder(128);
+		path.append(m2RepoPath).append(PATH_SEPARATOR);
+		path.append(formatAsDirectory(dependency.getGroupId())).append(PATH_SEPARATOR);
+		path.append(dependency.getArtifactId()).append(PATH_SEPARATOR);
+		path.append(getBaseVersion(dependency)).append(PATH_SEPARATOR);
+		path.append(dependency.getArtifactId()).append(ARTIFACT_SEPARATOR).append(dependency.getVersion());
+		path.append(".pom");
 
-		@Override
-		public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}
-
-		@Override
-		public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}
-
-		public ArrayList<Path> getPomPaths() {
-			return pomPaths;
-		}
+		return path.toString();
 
 	}
 
+	/**
+	 * @param dependency
+	 * @return
+	 */
+	private Object getBaseVersion(Dependency dependency) {
+		String SNAPSHOT_VERSION = "SNAPSHOT";
+		if (dependency.getVersion() == null) {
+			return "";
+		}
+		Matcher m = VERSION_FILE_PATTERN.matcher(dependency.getVersion());
+
+		if (m.matches()) {
+			return m.group(1) + "-" + SNAPSHOT_VERSION;
+		} else {
+			return dependency.getVersion();
+		}
+	}
+
+	/**
+	 * @param groupId
+	 * @return
+	 */
+	private Object formatAsDirectory(String groupId) {
+		return groupId.replaceAll("\\.", PATH_SEPARATOR + "");
+	}
 }
