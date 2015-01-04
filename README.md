@@ -1,4 +1,4 @@
 .m2-Shredder
 ============
 
-A tool to remove unwanted libraries in maven local repository.
+A tool to remove unused libraries in maven local repository.
