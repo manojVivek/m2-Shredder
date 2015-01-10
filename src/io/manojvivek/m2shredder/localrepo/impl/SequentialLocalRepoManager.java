@@ -8,12 +8,14 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.maven.model.Dependency;
+import org.codehaus.plexus.util.CollectionUtils;
 import org.codehaus.plexus.util.StringUtils;
 
 /**
@@ -145,5 +147,13 @@ public class SequentialLocalRepoManager implements LocalRepoManager {
 	 */
 	private Object formatAsDirectory(String groupId) {
 		return groupId.replaceAll("\\.", PATH_SEPARATOR + "");
+	}
+
+	/**
+	 * @param workspacePomQueue
+	 * @return
+	 */
+	public Collection<String> subtractUsedPoms(List<String> workspacePomQueue) {
+		return CollectionUtils.subtract(poms, workspacePomQueue);
 	}
 }

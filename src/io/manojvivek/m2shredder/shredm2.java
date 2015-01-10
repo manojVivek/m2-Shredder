@@ -10,8 +10,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.maven.model.Dependency;
@@ -40,20 +39,26 @@ public class shredm2 {
 				List<String> poms = workspacePomFinder.findPoms();
 				System.out.println("Worspace poms:" + poms.size() + " files:" + poms);
 
-				LinkedHashSet<String> workspacePomQueue = new LinkedHashSet<String>(poms);
-				Iterator<String> iterator = workspacePomQueue.iterator();
-				while (iterator.hasNext()) {
-					String pomFile = iterator.next();
+				List<String> workspacePomQueue = new ArrayList<String>(poms);
+				for (int i = 0; i < workspacePomQueue.size(); i++) {
+					// System.out.println("i:" + i);
+					String pomFile = workspacePomQueue.get(i);
 					try {
 						Model model = reader.read(new FileReader(pomFile));
 						List<Dependency> dependencies = model.getDependencies();
 						for (Dependency dependency : dependencies) {
-							System.out.println("Index:" + dependencies.indexOf(dependency));
+							// System.out.println("Index:" +
+							// dependencies.indexOf(dependency));
 							if (repoManager.hasArtifact(dependency)) {
 								String dependencyPomPath = repoManager.getLocalRepoPomPath(dependency);
-								System.out.println("Contains it:" + dependencyPomPath);
-								workspacePomQueue.add(dependencyPomPath);
-								System.out.println("Size after adding:" + workspacePomQueue.size());
+								// System.out.println("Contains it:" +
+								// dependencyPomPath);
+								if (!workspacePomQueue.contains(dependencyPomPath)) {
+									workspacePomQueue.add(dependencyPomPath);
+									// System.out.println("Size after adding:" +
+									// workspacePomQueue.size());
+								}
+
 							}
 
 						}
@@ -64,6 +69,10 @@ public class shredm2 {
 					}
 
 				}
+
+				System.out.println("Total poms after iterating workspace poms:" + workspacePomQueue.size());
+				System.out.println(repoManager.subtractUsedPoms(workspacePomQueue).size());
+				System.out.println("To delete:" + repoManager.subtractUsedPoms(workspacePomQueue));
 			} catch (PomFinderException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
