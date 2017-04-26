@@ -1,15 +1,16 @@
 package io.manojvivek.m2shredder.localrepo.impl;
 
-import io.manojvivek.m2shredder.exception.M2PathException;
-import io.manojvivek.m2shredder.exception.PomFinderException;
-import io.manojvivek.m2shredder.localrepo.LocalRepoManager;
-
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,6 +18,10 @@ import java.util.regex.Pattern;
 import org.apache.maven.model.Dependency;
 import org.codehaus.plexus.util.CollectionUtils;
 import org.codehaus.plexus.util.StringUtils;
+
+import io.manojvivek.m2shredder.exception.M2PathException;
+import io.manojvivek.m2shredder.exception.PomFinderException;
+import io.manojvivek.m2shredder.localrepo.LocalRepoManager;
 
 /**
  * @author manojvivek
@@ -155,5 +160,37 @@ public class SequentialLocalRepoManager implements LocalRepoManager {
 	 */
 	public Collection<String> subtractUsedPoms(List<String> workspacePomQueue) {
 		return CollectionUtils.subtract(poms, workspacePomQueue);
+	}
+
+	public long calculateStorageSize() throws Exception {
+		final AtomicLong size = new AtomicLong();
+		try {
+			Files.walkFileTree(Paths.get(m2RepoPath), new FileVisitor<Path>() {
+
+				@Override
+				public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+					return FileVisitResult.CONTINUE;
+				}
+
+				@Override
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+						size.addAndGet(attrs.size());
+					return FileVisitResult.CONTINUE;
+				}
+
+				@Override
+				public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+					return FileVisitResult.CONTINUE;
+				}
+
+				@Override
+				public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+					return FileVisitResult.CONTINUE;
+				}
+			});
+		} catch (IOException e) {
+			throw new Exception(e);
+		}
+		return size.longValue();
 	}
 }
